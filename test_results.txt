@@ -1,0 +1,12 @@
+FlatPatternCheck.iLogicVb, this exact file, run in Inventor 2025.2 on 10/10/2026.
+U-shaped test plate, 2 mm, two bends R2, built in Inventor, exported to STEP, re-imported, SubType sheet metal, Unfold2.
+
+clean part, thickness 2.000                      -> OK: the flat is one thickness high.
+1.9812 part, thickness set to 1.981 (rounded)    -> The flat is 38.02 mm higher than the thickness
+one outer radius 0.001 mm too large              -> The flat is 38.00 mm higher than the thickness
+one bend face stored as a B-spline               -> The flat is 38.00 mm higher than the thickness
+both bend faces stored as B-splines              -> The flat is 38.00 mm higher than the thickness
+holes in the flanges                             -> OK: the flat is one thickness high.
+hole in the bend                                 -> OK: the flat is one thickness high.
+1.9812 part, thickness set to 1.9812 (exact)     -> OK: the flat is one thickness high.
+run on an assembly                               -> Run it on a part, not on an assembly or a drawing.

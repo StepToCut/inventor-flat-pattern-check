@@ -1,0 +1,54 @@
+' FlatPatternCheck - run it on a sheet metal part after the unfold.
+' Unfold and Unfold2 can leave a bend folded and still return without an error.
+' If every bend unfolded, the flat body is exactly one thickness high; a bend left folded sticks out of it.
+' It does not check the flat length (K-factor, unfold rule). Not tested on formed features (louvers, embosses): they stay in the flat and would trigger it.
+' Tested on Inventor 2025.2. https://steptocut.com/blog/inventor-unfold-skips-bend-step/
+
+Sub Main()
+    If ThisDoc.Document.DocumentType <> DocumentTypeEnum.kPartDocumentObject Then
+        MessageBox.Show("Run it on a part, not on an assembly or a drawing.", "Flat pattern check")
+        Return
+    End If
+    Dim oDoc As PartDocument = ThisDoc.Document
+    If oDoc.SubType <> "{9C464203-9BAE-11D3-8BAD-0060B0CE6BB4}" Then
+        MessageBox.Show("Not a sheet metal part.", "Flat pattern check")
+        Return
+    End If
+    Dim oSM As SheetMetalComponentDefinition = oDoc.ComponentDefinition
+    If Not oSM.HasFlatPattern Then
+        MessageBox.Show("No flat pattern yet: unfold first.", "Flat pattern check")
+        Return
+    End If
+
+    Dim dExtraMm As Double = FlatExtraHeightMm(oSM)
+    If Double.IsNaN(dExtraMm) Then
+        MessageBox.Show("Could not measure the flat (no vertices or no planar face): check it by hand.", "Flat pattern check", _
+            MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Return
+    End If
+    If dExtraMm > 0.01 Then
+        MessageBox.Show("The flat is " & dExtraMm.ToString("0.00") & " mm higher than the thickness:" & vbCrLf & _
+            "at least one bend was not unfolded (or the part has formed features).", "Flat pattern check", _
+            MessageBoxButtons.OK, MessageBoxIcon.Error)
+    Else
+        MessageBox.Show("OK: the flat is one thickness high.", "Flat pattern check")
+    End If
+End Sub
+
+' Height of the flat body along the normal of its largest planar face, minus the thickness, in mm.
+' NaN if the flat body has no vertices or no planar face (treat as a failure).
+Function FlatExtraHeightMm(oSM As SheetMetalComponentDefinition) As Double
+    Dim oFlatBody As SurfaceBody = oSM.FlatPattern.Body
+    If oFlatBody.Vertices.Count = 0 Then Return Double.NaN
+    Dim oFlatFace As Face = oFlatBody.Faces.Cast(Of Face)().Where(Function(f) f.SurfaceType = SurfaceTypeEnum.kPlaneSurface).OrderBy(Function(f) f.Evaluator.Area).LastOrDefault()
+    If oFlatFace Is Nothing Then Return Double.NaN   ' no planar face in the flat: treat as a failure
+    Dim oNorm As UnitVector = CType(oFlatFace.Geometry, Plane).Normal
+    Dim dMin As Double = Double.MaxValue
+    Dim dMax As Double = Double.MinValue
+    For Each oV As Vertex In oFlatBody.Vertices
+        Dim d As Double = oV.Point.X * oNorm.X + oV.Point.Y * oNorm.Y + oV.Point.Z * oNorm.Z
+        dMin = Math.Min(dMin, d)
+        dMax = Math.Max(dMax, d)
+    Next
+    Return (dMax - dMin - oSM.Thickness.Value) * 10   ' database units are cm
+End Function
